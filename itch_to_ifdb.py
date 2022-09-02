@@ -35,6 +35,7 @@ class ItchData():
         self.cover = cover
         self.game_id = game_id
         self.params = params
+        # TODO: add language (default: en), license (default: Freeware), genre (how???)
 
     def __repr__(self):
         formatting_string = """
@@ -97,7 +98,6 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
     platform = None
     for row in rows:
         entries = list(row.iter(False))
-        #print(entries[0].text())
         if entries[0].text() == 'Made with':
             platform = entries[1].text()
         if entries[0].text() == 'Release date' or entries[0].text() == 'Published':
@@ -112,6 +112,7 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
         f.write(cover_request.content)
     # make the cover smaller
     subprocess.call('convert {0} -resize 400x300 {0}'.format(image_name), shell=True)
+    # if cover image is a gif, extract the first frame.
     if image_name.endswith('.gif'):
         subprocess.call('convert {0}[0] {0}'.format(image_name), shell=True)
     data = ItchData(url, title, author, release_date, desc, platform, image_name, game_id)
@@ -178,7 +179,6 @@ def find_ifdb_id(data):
     print(url)
     r = requests.get(url)
     tree = HTMLParser(r.content.decode("ISO-8859-1"), 'lxml')
-    # TODO: change this from beautifulsoup to selectolax
     if 'TUID' in tree.html:
         spans = tree.css('span#notes')
         for span in spans:
