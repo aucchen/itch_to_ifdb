@@ -17,60 +17,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 
-IFDB_Genres = []
-
-class ItchData():
-
-    fields = {'title', 'author', 'release', 'date', 'description', 'platform'}
-
-    def __init__(self, url, title, author, release, desc, platform, cover, 
-            game_id,
-            **params):
-        self.url = url
-        self.title = title
-        self.author = author
-        self.release = release
-        self.desc = desc
-        self.platform = platform
-        self.cover = cover
-        self.game_id = game_id
-        self.params = params
-        # TODO: add language (default: en), license (default: Freeware), genre (how???)
-
-    def __repr__(self):
-        formatting_string = """
-title: "{0}"
-author: "{1}"
-release: "{2}"
-description: "{3}"
-platform: "{4}" """.format(self.title, self.author, self.release, self.desc.strip().split('\n')[0] + '...', self.platform)
-        return formatting_string
-
-    def update_field(self, field, val):
-        if field == 'title':
-            self.title = val
-        elif field == 'author':
-            self.author = val
-        elif field == 'release date' or field == 'release' or field == 'date':
-            self.release = datetime.datetime.strptime(val, '%Y-%m-%d')
-        elif field == 'description':
-            self.desc = val
-        elif field == 'platform':
-            self.platform = val
-
-    def to_json(self):
-        return json.dumps({
-            'title': self.title, 'url': self.url, 'author': self.author,
-            'release': self.release, 'desc': self.desc, 'platform': self.platform,
-            'cover': self.cover, 'game_id': self.game_id
-            })
-
-    @classmethod
-    def from_json(json_text):
-        data = json.loads(json_text)
-        return ItchData(data['url'], data['title'], data['author'], data['release'],
-                data['desc'], data['platform'], data['cover'], data['game_id'])
-
+from itch_data import ItchData
 
 def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
     """
@@ -197,8 +144,8 @@ def upload_selenium(data, destination='https://ifdb.org'):
     # destination could be http://localhost:8080
     # admin email/password for test: ifdbadmin@ifdb.org, secret
     # 1. log in
-    username = input('IFDB email:')
-    password = input('IFDB password:')
+    username = input('IFDB email: ')
+    password = input('IFDB password: ')
     options = Options()
     # options.headless = True
     driver = webdriver.Firefox(options=options)
@@ -227,15 +174,23 @@ def upload_selenium(data, destination='https://ifdb.org'):
         if 'none' not in c_id:
             highest_cover_check = c
     highest_cover_check.click()
+    # set release date
     # first publication date: dd-Mon-yyyy
     if data.release:
         month_shortened = data.release.strftime('%B')[:3]
         release_time = data.release.strftime('%d-{0}-%Y'.format(month_shortened))
         driver.find_element(By.ID, 'published').send_keys(release_time)
+    # other fields
     if data.platform:
         driver.find_element(By.ID, 'system').send_keys(data.platform)
     if data.desc:
         driver.find_element(By.ID, 'desc').send_keys(data.desc)
+    if data.language:
+        driver.find_element(By.ID, 'language').send_keys(data.language)
+    if data.license:
+        driver.find_element(By.ID, 'license').send_keys(data.license)
+    if data.genre:
+        driver.find_element(By.ID, 'genre').send_keys(data.genre)
     driver.find_element(By.ID, 'website').send_keys(data.url)
     # submit
     driver.find_element(By.ID, 'editgame-save-button').click()
@@ -257,6 +212,7 @@ def create_links(data):
     format.text = 'html'
     return root
 
+
 def correct_data(data):
     """
     Prompts for user correction for the given ItchData...
@@ -264,14 +220,18 @@ def correct_data(data):
     print('Data from itch.io: ')
     print(str(data))
     is_correct = input('Is this correct? (Y/N) ').lower()
-    while is_correct == 'n':
+    while is_correct != 'y':
         field = input('Which field should be corrected? ').lower()
-        while field not in data.fields:
+        while field not in data.FIELDS:
             field = input('Error: invalid field. Which field should be corrected? ').lower()
         if field == 'date' or field == 'release':
             val = input('Enter a date (as YYYY-MM-DD): ')
         elif field == 'platform':
             val = input('Enter a platform (Twine, Ink, Unity, ChoiceScript, etc.): ')
+        elif field == 'genre':
+            val = input('Possible genres: ' + ', '.join(ItchData.GENRES) + ': ')
+        elif field == 'license':
+            val = input('Possible licenses: ' + ', '.join(ItchData.LICENSES) + ': ')
         else:
             val = input('Enter the correct value: ')
         data.update_field(field, val)
@@ -279,6 +239,7 @@ def correct_data(data):
         print(str(data))
         is_correct = input('Is this correct? (Y/N) ').lower()
     return data
+
 
 def run_pipeline(url=None, destination='http://ifdb.org/putific'):
     if not url:
@@ -315,12 +276,12 @@ def run_pipeline_selenium(url=None, destination='https://ifdb.org/'):
     ifdb_exists = find_ifdb_id(data)
     if ifdb_exists is not None:
         print('Warning: game may already exist on IFDB - https://ifdb.org/viewgame?id=' + ifdb_exists)
-        to_continue = input('Do you still wish to continue uploading? (y/N):').lower()
+        to_continue = input('Do you still wish to continue uploading? (y/N): ').lower()
         if to_continue != 'y':
             return
     data = correct_data(data)
     # do the upload
-    to_continue = input('Do you wish to upload? (y/N):').lower()
+    to_continue = input('Do you wish to upload? (y/N): ').lower()
     if to_continue != 'y':
         print('Data not uploaded.')
         return
