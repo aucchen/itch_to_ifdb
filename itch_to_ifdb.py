@@ -37,7 +37,7 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
     title, author = title_author.split(' by ')
     # get full description
     desc = tree.css_first('div.formatted_description')
-    # TODO: better format the description?
+    # TODO: better formatting for the description?
     desc = desc.text()
     # get release date, platform
     rows = tree.css('tr')
@@ -213,39 +213,11 @@ def create_links(data):
     return root
 
 
-def correct_data(data):
-    """
-    Prompts for user correction for the given ItchData...
-    """
-    print('Data from itch.io: ')
-    print(str(data))
-    is_correct = input('Is this correct? (Y/N) ').lower()
-    while is_correct != 'y':
-        field = input('Which field should be corrected? ').lower()
-        while field not in data.FIELDS:
-            field = input('Error: invalid field. Which field should be corrected? ').lower()
-        if field == 'date' or field == 'release':
-            val = input('Enter a date (as YYYY-MM-DD): ')
-        elif field == 'platform':
-            val = input('Enter a platform (Twine, Ink, Unity, ChoiceScript, etc.): ')
-        elif field == 'genre':
-            val = input('Possible genres: ' + ', '.join(ItchData.GENRES) + ': ')
-        elif field == 'license':
-            val = input('Possible licenses: ' + ', '.join(ItchData.LICENSES) + ': ')
-        else:
-            val = input('Enter the correct value: ')
-        data.update_field(field, val)
-        print('Updated data:')
-        print(str(data))
-        is_correct = input('Is this correct? (Y/N) ').lower()
-    return data
-
-
 def run_pipeline(url=None, destination='http://ifdb.org/putific'):
     if not url:
         url = input('Enter an itch.io URL: ')
     data = get_itch_data(url)
-    data = correct_data(data)
+    data.correct_data()
     print('\nCreating xml for ifdb upload...\n')
     xml_root = create_xml(data)
     links = create_links(data)
@@ -279,7 +251,7 @@ def run_pipeline_selenium(url=None, destination='https://ifdb.org/'):
         to_continue = input('Do you still wish to continue uploading? (y/N): ').lower()
         if to_continue != 'y':
             return
-    data = correct_data(data)
+    data.correct_data()
     # do the upload
     to_continue = input('Do you wish to upload? (y/N): ').lower()
     if to_continue != 'y':

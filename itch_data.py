@@ -30,16 +30,14 @@ class ItchData():
         self.genre = genre
 
     def __repr__(self):
-        formatting_string = """
-title: {0}
+        formatting_string = """title: {0}
 author: {1}
 release: {2}
 description: "{3}"
 platform: {4}
 language: {5}
 license: {6}
-genre: {7}
-""".format(self.title, self.author, self.release, self.desc.strip().split('\n')[0] + '...', self.platform, self.language, self.license, self.genre)
+genre: {7}""".format(self.title, self.author, self.release, self.desc.strip().split('\n')[0] + '...', self.platform, self.language, self.license, self.genre)
         return formatting_string
 
     def update_field(self, field, val):
@@ -52,6 +50,33 @@ genre: {7}
         print('Warning: field "{0}" is unknown.'.format(field))
         return
 
+    def correct_data(self):
+        """
+        Prompts for user correction of the fields.
+        """
+        print('Data from itch.io: ')
+        print(str(self))
+        is_correct = input('Is this correct? (Y/N) ').lower()
+        while is_correct != 'y':
+            field = input('Which field should be corrected? ').lower()
+            while field not in self.FIELDS:
+                field = input('Error: invalid field. Which field should be corrected? ').lower()
+            if field == 'date' or field == 'release':
+                val = input('Enter a date (as YYYY-MM-DD): ')
+            elif field == 'platform':
+                val = input("Enter a platform (Twine, Ink, Unity, ChoiceScript, Ren'Py, etc.): ")
+            elif field == 'genre':
+                val = input('Possible genres: ' + ', '.join(ItchData.GENRES) + ': ')
+            elif field == 'license':
+                val = input('Possible licenses: ' + ', '.join(ItchData.LICENSES) + ': ')
+            else: 
+                val = input('Enter the correct value: ')
+            self.update_field(field, val)
+            print('Updated self:')
+            print(str(self))
+            is_correct = input('Is this correct? (Y/N) ').lower()
+        return self
+
     def to_json(self):
         return json.dumps({f: self.__dict__[f] for f in ItchData.FIELDS})
 
@@ -61,4 +86,6 @@ genre: {7}
         itch_data = ItchData(data['url'], data['title'], data['author'], data['release'],
                 data['desc'], data['platform'], data['cover'], data['game_id'])
         return itch_data
+
+
 
