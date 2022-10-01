@@ -126,12 +126,14 @@ def find_ifdb_id(data):
     print(url)
     r = requests.get(url)
     tree = HTMLParser(r.content.decode("ISO-8859-1"), 'lxml')
+    print(tree.html)
     if 'TUID' in tree.html:
         spans = tree.css('span#notes')
         for span in spans:
             if 'TUID' in span.text:
                 tuid = span.text.split(':')[-1].strip()
                 return tuid
+        return True
     else:
         try:
             url = tree.css_first('td').css_first('a').attrs['href']
@@ -197,6 +199,74 @@ def upload_selenium(data, destination='https://ifdb.org'):
     driver.close()
 
 
+def upload_selenium_multiple(datas, destination='https://ifdb.org'):
+    # destination could be http://localhost:8080
+    # admin email/password for test: ifdbadmin@ifdb.org, secret
+    # 1. log in
+    username = input('IFDB email: ')
+    password = input('IFDB password: ')
+    options = Options()
+    # options.headless = True
+    driver = webdriver.Firefox(options=options)
+    driver.get(destination + '/login')
+    driver.find_element(By.ID, 'userid').send_keys(username)
+    driver.find_element(By.ID, 'password').send_keys(password)
+    driver.find_element(By.XPATH, "//input[@type='submit']").click()
+    for data in datas:
+        # try to correct data
+        ifdb_exists = find_ifdb_id(data)
+        if ifdb_exists is not None:
+            print('Warning: game may already exist on IFDB - https://ifdb.org/viewgame?id=' + str(ifdb_exists))
+            to_continue = input('Do you still wish to continue uploading? (y/N): ').lower()
+            if to_continue != 'y':
+                continue
+        data.correct_data()
+        # 2. fill in game stuff
+        driver.get(destination + '/editgame?id=new')
+        driver.find_element(By.ID, 'title').send_keys(data.title)
+        driver.find_element(By.ID, 'eAuthor').send_keys(data.author)
+        # upload cover art (why is it so complicated???)
+        if data.cover:
+            driver.execute_script('document.getElementById("coverart-iframe").style.display = "block";')
+            driver.switch_to.frame('coverart-iframe')
+            cover_art = driver.find_element(By.ID, 'uplFile')
+            art_url = os.path.join(os.getcwd(), data.cover)
+            cover_art.send_keys(art_url)
+            driver.switch_to.default_content()
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'okbtn'))).click()
+            time.sleep(1)
+            # click on the most recently updated cover image
+            cover_checks = driver.find_elements(By.XPATH, '//input[@name="coverart"]')
+            highest_cover_check = None
+            for c in cover_checks:
+                c_id = c.get_attribute('id')
+                if 'none' not in c_id:
+                    highest_cover_check = c
+            highest_cover_check.click()
+        # set release date
+        # first publication date: dd-Mon-yyyy
+        if data.release:
+            month_shortened = data.release.strftime('%B')[:3]
+            release_time = data.release.strftime('%d-{0}-%Y'.format(month_shortened))
+            driver.find_element(By.ID, 'published').send_keys(release_time)
+        # other fields
+        if data.platform:
+            driver.find_element(By.ID, 'system').send_keys(data.platform)
+        if data.desc:
+            driver.find_element(By.ID, 'desc').send_keys(data.desc)
+        if data.language:
+            driver.find_element(By.ID, 'language').send_keys(data.language)
+        if data.license:
+            driver.find_element(By.ID, 'license').send_keys(data.license)
+        if data.genre:
+            driver.find_element(By.ID, 'genre').send_keys(data.genre)
+        driver.find_element(By.ID, 'website').send_keys(data.url)
+        # submit
+        driver.find_element(By.ID, 'editgame-save-button').click()
+    driver.close()
+
+
+
 def create_links(data):
     nsmap = {None: 'http://ifdb.org/api/xmlns'}
     root = etree.Element('downloads', nsmap=nsmap)
@@ -259,6 +329,29 @@ def run_pipeline_selenium(url=None, destination='https://ifdb.org/'):
         return
     upload_selenium(data, destination)
 
+def run_pipeline_ifdb(ifdb_file):
+    import pandas as pd
+    data = pd.read_csv(ifdb_file, sep='\t')
+    data_itch = []
+    release_date = datetime.date.today()
+    for i, row in data.iterrows():
+        cover_file = 'ifcomp_2022_covers/' + row.title + '.jpg'
+        if not os.path.exists(cover_file):
+            cover_file = 'ifcomp_2022_covers/' + row.title + '.png'
+            if not os.path.exists(cover_file):
+                cover_file = ''
+        rd = ItchData(row.url, row.title, row.author, release_date,
+                row.desc, row.platform, cover_file)
+        if type(rd.platform) != str:
+            rd.platform = ''
+        if type(rd.desc) != str:
+            rd.desc = ''
+        print(rd)
+        rd.desc = rd.desc.replace('\n', '<br/>')
+        data_itch.append(rd)
+    upload_selenium_multiple(data_itch)
+
 
 if __name__ == '__main__':
-    run_pipeline_selenium()
+    #run_pipeline_selenium()
+    run_pipeline_ifdb('data_2022.tsv')

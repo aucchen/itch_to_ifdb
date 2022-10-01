@@ -72,7 +72,7 @@ genre: {7}""".format(self.title, self.author, self.release, self.desc.strip().sp
             else: 
                 val = input('Enter the correct value: ')
             self.update_field(field, val)
-            print('Updated self:')
+            print('\nUpdated self:')
             print(str(self))
             is_correct = input('Is this correct? (Y/N) ').lower()
         return self
