@@ -47,7 +47,7 @@ def get_ratings(ifdb_id, end_date=None):
     for child in indented_div.children:
         if child.name == 'p':
             image = child.find('img')
-            if image:
+            if image and 'Star' in image['title']:
                 current_stars = int(image['title'][0])
                 if end_date is not None:
                     try:
@@ -58,7 +58,7 @@ def get_ratings(ifdb_id, end_date=None):
                     except:
                         continue
                 all_stars.append(current_stars)
-        elif child.name == 'img':
+        elif child.name == 'img' and 'Star' in child.title:
             current_stars = int(child['title'][0])
             if end_date is None:
                 all_stars.append(current_stars)
