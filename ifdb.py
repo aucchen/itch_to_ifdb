@@ -41,6 +41,7 @@ def get_ratings(ifdb_id, end_date=None):
         html = data.decode("ISO-8859-1")
     soup = BeautifulSoup(html, 'lxml')
     indented_div = soup.find_all('div', attrs={'class': 'indented'})[0]
+    print(len(indented_div))
     all_stars = []
     current_stars = 0
     current_date = datetime.datetime(2010, 1, 1)
@@ -48,6 +49,7 @@ def get_ratings(ifdb_id, end_date=None):
         if child.name == 'p':
             image = child.find('img')
             if image and 'Star' in image['title']:
+                print('image', child)
                 current_stars = int(image['title'][0])
                 if end_date is not None:
                     try:
@@ -58,7 +60,8 @@ def get_ratings(ifdb_id, end_date=None):
                     except:
                         continue
                 all_stars.append(current_stars)
-        elif child.name == 'img' and 'Star' in child.title:
+        elif child.name == 'img' and child['title'] is not None and 'Star' in child['title']:
+            print('review', child)
             current_stars = int(child['title'][0])
             if end_date is None:
                 all_stars.append(current_stars)
@@ -70,7 +73,7 @@ def get_ratings(ifdb_id, end_date=None):
                     continue
                 all_stars.append(current_stars)
             except:
-                pass
+                continue
     count = len(all_stars)
     mean = 0
     if count > 0:
@@ -78,7 +81,7 @@ def get_ratings(ifdb_id, end_date=None):
     return mean, count
 
 
-def get_rankings(tag="IFComp 2021"):
+def get_rankings(tag="IFComp 2022"):
     """
     Returns a list of games sorted by their rank.
     """
