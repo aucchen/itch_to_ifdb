@@ -13,7 +13,7 @@ import requests
 
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -51,6 +51,7 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
             date = entries[1].css_first('abbr').attributes['title']
             release_date = datetime.datetime.strptime(date, '%d %B %Y @ %H:%M')
     # get cover image
+    # TODO: what if the cover image doesn't exist?
     cover_url = tree.head.css_first('meta[property="og:image"]').attributes['content']
     # download cover
     cover_request = requests.get(cover_url)
@@ -141,24 +142,31 @@ def find_ifdb_id(data):
         except:
             return None
 
-
-def upload_selenium(data, destination='https://ifdb.org'):
-    # destination could be http://localhost:8080
-    # admin email/password for test: ifdbadmin@ifdb.org, secret
-    # 1. log in
+def login_selenium(driver, destination='https://ifdb.org'):
     username = input('IFDB email: ')
     password = input('IFDB password: ')
-    options = Options()
     # options.headless = True
-    driver = webdriver.Firefox(options=options)
     driver.get(destination + '/login')
     driver.find_element(By.ID, 'userid').send_keys(username)
     driver.find_element(By.ID, 'password').send_keys(password)
     driver.find_element(By.XPATH, "//input[@type='submit']").click()
+
+def upload_selenium(data, destination='https://ifdb.org', login=True, driver=None, add_link=True):
+    # destination could be http://localhost:8080
+    # admin email/password for test: ifdbadmin@ifdb.org, secret
+    # 1. log in
+    close_driver = False
+    if driver is None:
+        close_driver = True
+        options = Options()
+        driver = webdriver.Firefox(options=options)
+    if login:
+        login_selenium(driver, destination)
     # 2. fill in game stuff
     driver.get(destination + '/editgame?id=new')
     driver.find_element(By.ID, 'title').send_keys(data.title)
     driver.find_element(By.ID, 'eAuthor').send_keys(data.author)
+
     # upload cover art (why is it so complicated???)
     driver.execute_script('document.getElementById("coverart-iframe").style.display = "block";')
     driver.switch_to.frame('coverart-iframe')
@@ -194,9 +202,33 @@ def upload_selenium(data, destination='https://ifdb.org'):
     if data.genre:
         driver.find_element(By.ID, 'genre').send_keys(data.genre)
     driver.find_element(By.ID, 'website').send_keys(data.url)
+    # add link
+    if add_link:
+        driver.find_element(By.XPATH, '//a[@title="Add a new item"]').click()
+        driver.find_element(By.ID, 'linkEditBtn0').click()
+        #driver.execute_script('document.getElementById("linkpopup").style.display = "";')
+        driver.find_element(By.ID, 'linkurl').send_keys(data.url)
+        driver.find_element(By.ID, 'linktitle').send_keys('Play on itch.io')
+        time.sleep(1)
+        linkfmtng = driver.find_element(By.ID, 'linkfmtNG')
+        if linkfmtng.is_displayed():
+            select = Select(linkfmtng)
+            html_val = '35'
+            select.select_by_value(html_val)
+        #lmao don't ask why i have to do this
+        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'linkisgame'))).click()
+        linkfmtg = driver.find_element(By.ID, 'linkfmtG')
+        if linkfmtg.is_displayed():
+            select = Select(linkfmtg)
+            html_val = '53'
+            select.select_by_value(html_val)
+        # check box
+        # close
+        driver.execute_script('closeLinkPopup(); return false;')
     # submit
     driver.find_element(By.ID, 'editgame-save-button').click()
-    driver.close()
+    if close_driver:
+        driver.close()
 
 
 def upload_selenium_multiple(datas, destination='https://ifdb.org'):
@@ -310,7 +342,7 @@ def run_pipeline(url=None, destination='http://ifdb.org/putific'):
     print('Response: ', r.content)
     return r
 
-def run_pipeline_selenium(url=None, destination='https://ifdb.org/'):
+def run_pipeline_selenium(url=None, destination='https://ifdb.org/', driver=None, login=True):
     if not url:
         url = input('Enter an itch.io URL: ')
     data = get_itch_data(url)
@@ -327,7 +359,14 @@ def run_pipeline_selenium(url=None, destination='https://ifdb.org/'):
     if to_continue != 'y':
         print('Data not uploaded.')
         return
-    upload_selenium(data, destination)
+    upload_selenium(data, destination, driver=driver, login=login)
+
+def run_pipeline_selenium_loop(destination='https://ifdb.org/'):
+    options = Options()
+    driver = webdriver.Firefox(options=options)
+    login_selenium(driver, destination) 
+    while True:
+        run_pipeline_selenium(destination=destination, driver=driver, login=False)
 
 def run_pipeline_ifdb(ifdb_file):
     import pandas as pd
@@ -353,5 +392,6 @@ def run_pipeline_ifdb(ifdb_file):
 
 
 if __name__ == '__main__':
-    #run_pipeline_selenium()
-    run_pipeline_ifdb('data_2022.tsv')
+    #run_pipeline_selenium_loop('http://localhost:8080/')
+    run_pipeline_selenium_loop('https://ifdb.org/')
+    #run_pipeline_ifdb('data_2022.tsv')
