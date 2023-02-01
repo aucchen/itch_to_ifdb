@@ -208,7 +208,10 @@ def upload_selenium(data, destination='https://ifdb.org', login=True, driver=Non
         driver.find_element(By.ID, 'linkEditBtn0').click()
         #driver.execute_script('document.getElementById("linkpopup").style.display = "";')
         driver.find_element(By.ID, 'linkurl').send_keys(data.url)
-        driver.find_element(By.ID, 'linktitle').send_keys('Play on itch.io')
+        if 'itch.io' in data.url:
+            driver.find_element(By.ID, 'linktitle').send_keys('Play on itch.io')
+        else:
+            driver.find_element(By.ID, 'linktitle').send_keys('Play Online')
         time.sleep(1)
         linkfmtng = driver.find_element(By.ID, 'linkfmtNG')
         if linkfmtng.is_displayed():
