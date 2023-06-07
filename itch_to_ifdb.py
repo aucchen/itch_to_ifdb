@@ -134,7 +134,7 @@ def find_ifdb_id(data):
             if 'TUID' in span.text:
                 tuid = span.text.split(':')[-1].strip()
                 return tuid
-        return True
+        return url
     else:
         try:
             url = tree.css_first('td').css_first('a').attrs['href']
@@ -392,6 +392,14 @@ def run_pipeline_ifdb(ifdb_file):
         rd.desc = rd.desc.replace('\n', '<br/>')
         data_itch.append(rd)
     upload_selenium_multiple(data_itch)
+
+
+def run_pipeline_list(urls, destination='https://ifdb.org'):
+    options = Options()
+    driver = webdriver.Firefox(options=options)
+    login_selenium(driver, destination) 
+    for url in urls:
+        run_pipeline_selenium(url=url, destination=destination, driver=driver, login=False)
 
 
 if __name__ == '__main__':
