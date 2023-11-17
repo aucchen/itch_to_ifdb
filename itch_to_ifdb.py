@@ -52,17 +52,22 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
             release_date = datetime.datetime.strptime(date, '%d %B %Y @ %H:%M')
     # get cover image
     # TODO: what if the cover image doesn't exist?
-    cover_url = tree.head.css_first('meta[property="og:image"]').attributes['content']
+    try:
+        cover_url = tree.head.css_first('meta[property="og:image"]').attributes['content']
+    except:
+        cover_url = ''
+        image_name = ''
     # download cover
-    cover_request = requests.get(cover_url)
-    image_name = cover_url.split('/')[-1]
-    with open(image_name, 'wb') as f:
-        f.write(cover_request.content)
-    # make the cover smaller
-    subprocess.call('convert {0} -resize 400x300 {0}'.format(image_name), shell=True)
-    # if cover image is a gif, extract the first frame.
-    if image_name.endswith('.gif'):
-        subprocess.call('convert {0}[0] {0}'.format(image_name), shell=True)
+    if cover_url:
+        cover_request = requests.get(cover_url)
+        image_name = cover_url.split('/')[-1]
+        with open(image_name, 'wb') as f:
+            f.write(cover_request.content)
+        # make the cover smaller
+        subprocess.call('convert {0} -resize 400x300 {0}'.format(image_name), shell=True)
+        # if cover image is a gif, extract the first frame.
+        if image_name.endswith('.gif'):
+            subprocess.call('convert {0}[0] {0}'.format(image_name), shell=True)
     data = ItchData(url, title, author, release_date, desc, platform, image_name, game_id)
     return data
 
@@ -113,8 +118,8 @@ def create_xml(data):
     url = etree.SubElement(contacts, 'url')
     url.text = data.url
 
-    xml = etree.tostring(root, pretty_print=True, xml_declaration=True, encoding='UTF-8')
-    print(xml.decode('utf-8'))
+    #xml = etree.tostring(root, pretty_print=True, xml_declaration=True, encoding='UTF-8')
+    #print(xml.decode('utf-8'))
     return root
 
 def find_ifdb_id(data):
@@ -127,18 +132,18 @@ def find_ifdb_id(data):
     print(url)
     r = requests.get(url)
     tree = HTMLParser(r.content.decode("ISO-8859-1"), 'lxml')
-    print(tree.html)
+    #print(tree.html)
     if 'TUID' in tree.html:
         spans = tree.css('span#notes')
         for span in spans:
             if 'TUID' in span.text:
                 tuid = span.text.split(':')[-1].strip()
-                return tuid
+                return 'https://ifdb.org/viewgame?id=' + tuid
         return url
     else:
         try:
             url = tree.css_first('td').css_first('a').attrs['href']
-            return url.split('=')[-1]
+            return url
         except:
             return None
 
@@ -168,22 +173,23 @@ def upload_selenium(data, destination='https://ifdb.org', login=True, driver=Non
     driver.find_element(By.ID, 'eAuthor').send_keys(data.author)
 
     # upload cover art (why is it so complicated???)
-    driver.execute_script('document.getElementById("coverart-iframe").style.display = "block";')
-    driver.switch_to.frame('coverart-iframe')
-    cover_art = driver.find_element(By.ID, 'uplFile')
-    art_url = os.path.join(os.getcwd(), data.cover)
-    cover_art.send_keys(art_url)
-    driver.switch_to.default_content()
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'okbtn'))).click()
-    time.sleep(1)
-    # click on the most recently updated cover image
-    cover_checks = driver.find_elements(By.XPATH, '//input[@name="coverart"]')
-    highest_cover_check = None
-    for c in cover_checks:
-        c_id = c.get_attribute('id')
-        if 'none' not in c_id:
-            highest_cover_check = c
-    highest_cover_check.click()
+    if data.cover:
+        driver.execute_script('document.getElementById("coverart-iframe").style.display = "block";')
+        driver.switch_to.frame('coverart-iframe')
+        cover_art = driver.find_element(By.ID, 'uplFile')
+        art_url = os.path.join(os.getcwd(), data.cover)
+        cover_art.send_keys(art_url)
+        driver.switch_to.default_content()
+        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'okbtn'))).click()
+        time.sleep(1)
+        # click on the most recently updated cover image
+        cover_checks = driver.find_elements(By.XPATH, '//input[@name="coverart"]')
+        highest_cover_check = None
+        for c in cover_checks:
+            c_id = c.get_attribute('id')
+            if 'none' not in c_id:
+                highest_cover_check = c
+        highest_cover_check.click()
     # set release date
     # first publication date: dd-Mon-yyyy
     if data.release:
@@ -251,7 +257,7 @@ def upload_selenium_multiple(datas, destination='https://ifdb.org'):
         # try to correct data
         ifdb_exists = find_ifdb_id(data)
         if ifdb_exists is not None:
-            print('Warning: game may already exist on IFDB - https://ifdb.org/viewgame?id=' + str(ifdb_exists))
+            print('Warning: game may already exist on IFDB - ' + str(ifdb_exists))
             to_continue = input('Do you still wish to continue uploading? (y/N): ').lower()
             if to_continue != 'y':
                 continue
@@ -352,7 +358,7 @@ def run_pipeline_selenium(url=None, destination='https://ifdb.org/', driver=None
     # search ifdb to see if the game already exists
     ifdb_exists = find_ifdb_id(data)
     if ifdb_exists is not None:
-        print('Warning: game may already exist on IFDB - https://ifdb.org/viewgame?id=' + ifdb_exists)
+        print('Warning: game may already exist on IFDB - ' + ifdb_exists)
         to_continue = input('Do you still wish to continue uploading? (y/N): ').lower()
         if to_continue != 'y':
             return
@@ -401,8 +407,21 @@ def run_pipeline_list(urls, destination='https://ifdb.org'):
     for url in urls:
         run_pipeline_selenium(url=url, destination=destination, driver=driver, login=False)
 
+def run_pipeline_csv(csv_path, destination='https://ifdb.org'):
+    "Runs a pipeline using a csv exported from an itch.io game jam"
+    import pandas as pd
+    data = pd.read_csv(csv_path, index_col=False) 
+    urls = data.game_url
+    options = Options()
+    driver = webdriver.Firefox(options=options)
+    login_selenium(driver, destination) 
+    for url in urls:
+        run_pipeline_selenium(url=url, destination=destination, driver=driver, login=False)
+
 
 if __name__ == '__main__':
     #run_pipeline_selenium_loop('http://localhost:8080/')
-    run_pipeline_selenium_loop('https://ifdb.org/')
+    #run_pipeline_csv('neo-twiny-jam-2023-06-30.csv')
+    #run_pipeline_selenium_loop('https://ifdb.org/')
     #run_pipeline_ifdb('data_2022.tsv')
+    run_pipeline_csv('single-choice-jam.csv')

@@ -80,6 +80,20 @@ def get_ratings(ifdb_id, end_date=None):
         mean = float(sum(all_stars))/count
     return mean, count
 
+def get_ratings_api(tuid):
+    """
+    Returns the average rating and count using the IFDB API.
+    """
+    url = 'https://ifdb.org/viewgame?ifiction&id=' + tuid
+    with urllib.request.urlopen(url) as fp:
+        data = fp.read()
+    xml = BeautifulSoup(data, features='xml')
+    title = xml.find('title').text
+    print(title)
+    mean = float(xml.find('averageRating').text)
+    count = int(xml.find('ratingCountAvg').text)
+    return mean, count
+
 
 def get_rankings(tag="IFComp 2022"):
     """
