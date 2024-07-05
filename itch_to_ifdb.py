@@ -37,8 +37,21 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
     title, author = title_author.split(' by ')
     # get full description
     desc = tree.css_first('div.formatted_description')
-    # TODO: better formatting for the description?
-    desc = desc.text()
+    # TODO: better formatting for the description? iterate through all child elements and...
+    try:
+        text = ''
+        for c in desc.iter():
+            if c.tag == 'p':
+                t = c.text().strip()
+                if t:
+                    text += t + '\n\n'
+            elif c.tag == 'ul' or c.tag == 'ol':
+                text += c.text(separator='\n')
+            else:
+                text += c.text() + '\n'
+        desc = text.strip()
+    except:
+        desc = ""
     # get release date, platform
     rows = tree.css('tr')
     release_date = None
@@ -49,7 +62,7 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
             platform = entries[1].text()
         if entries[0].text() == 'Release date' or entries[0].text() == 'Published':
             date = entries[1].css_first('abbr').attributes['title']
-            release_date = datetime.datetime.strptime(date, '%d %B %Y @ %H:%M')
+            release_date = datetime.datetime.strptime(date, '%d %B %Y @ %H:%M UTC')
     # get cover image
     # TODO: what if the cover image doesn't exist?
     try:
@@ -424,4 +437,8 @@ if __name__ == '__main__':
     #run_pipeline_csv('neo-twiny-jam-2023-06-30.csv')
     #run_pipeline_selenium_loop('https://ifdb.org/')
     #run_pipeline_ifdb('data_2022.tsv')
-    run_pipeline_csv('single-choice-jam.csv')
+    #run_pipeline_csv('single-choice-jam.csv')
+    #run_pipeline_csv('smoochie-jam-24.csv')
+    #run_pipeline_csv('dialogue-jam-24.csv')
+    #run_pipeline_csv('locus-jam-24.csv')
+    run_pipeline_csv('neo-twiny-jam-24.csv')
