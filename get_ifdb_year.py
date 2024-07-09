@@ -29,7 +29,7 @@ def parse_search_result(url):
         print(game_info)
         all_game_info.append(game_info)
         time.sleep(0.1)
-    return all_results
+    return all_game_info
 
 def get_game_info(tuid):
     url = 'https://ifdb.org/viewgame?ifiction&id=' + tuid
