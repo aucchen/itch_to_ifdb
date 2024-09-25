@@ -182,6 +182,8 @@ def upload_selenium(data, destination='https://ifdb.org', login=True, driver=Non
         login_selenium(driver, destination)
     # 2. fill in game stuff
     driver.get(destination + '/editgame?id=new')
+    driver.execute_script('document.getElementsByTagName("html")[0].style.scrollBehavior = "auto"')
+
     driver.find_element(By.ID, 'title').send_keys(data.title)
     driver.find_element(By.ID, 'eAuthor').send_keys(data.author)
 
@@ -223,7 +225,9 @@ def upload_selenium(data, destination='https://ifdb.org', login=True, driver=Non
     driver.find_element(By.ID, 'website').send_keys(data.url)
     # add link
     if add_link:
-        driver.find_element(By.XPATH, '//a[@title="Add a new item"]').click()
+        e1 = driver.find_element(By.XPATH, '//button[@class="linkModelAdd fancy-button"]')
+        driver.execute_script('arguments[0].scrollIntoView();', e1)
+        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, '//button[@class="linkModelAdd fancy-button"]'))).click()
         driver.find_element(By.ID, 'linkEditBtn0').click()
         #driver.execute_script('document.getElementById("linkpopup").style.display = "";')
         driver.find_element(By.ID, 'linkurl').send_keys(data.url)
@@ -236,6 +240,8 @@ def upload_selenium(data, destination='https://ifdb.org', login=True, driver=Non
         if linkfmtng.is_displayed():
             select = Select(linkfmtng)
             html_val = '35'
+            #driver.execute_script('arguments[0].scrollIntoView();', linkfmtng)
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'linkfmtNG')))
             select.select_by_value(html_val)
         #lmao don't ask why i have to do this
         WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'linkisgame'))).click()
@@ -364,7 +370,7 @@ def run_pipeline(url=None, destination='http://ifdb.org/putific'):
     print('Response: ', r.content)
     return r
 
-def run_pipeline_selenium(url=None, destination='https://ifdb.org/', driver=None, login=True):
+def run_pipeline_selenium(url=None, destination='https://ifdb.org/', driver=None, login=True, add_link=True):
     if not url:
         url = input('Enter an itch.io URL: ')
     data = get_itch_data(url)
@@ -381,7 +387,34 @@ def run_pipeline_selenium(url=None, destination='https://ifdb.org/', driver=None
     if to_continue != 'y':
         print('Data not uploaded.')
         return
-    upload_selenium(data, destination, driver=driver, login=login)
+    upload_selenium(data, destination, driver=driver, login=login, add_link=add_link)
+
+def run_pipeline_api(url=None, destination='http://ifdb.org/putific', username=None, password=None):
+    if not url:
+        url = input('Enter an itch.io URL: ')
+    data = get_itch_data(url)
+    data.correct_data()
+    print('\nCreating xml for ifdb upload...\n')
+    xml_root = create_xml(data)
+    links = create_links(data)
+    # TODO: create the wrapped file
+    # get ifdb username/password
+    ifdb_username = input('Enter your IFDB email: ')
+    ifdb_password = input('Enter your IFDB password: ')
+    upload_url = destination
+    upload_data = {'username': ifdb_username, 'password': ifdb_password}
+    output_etree = etree.tostring(xml_root, pretty_print=True, xml_declaration=True, encoding='utf-8')
+    output_etree = output_etree.replace(b'&lt;br/&gt;', b'<br/>')
+    params = {'username': ('', ifdb_username),
+              'password': ('', ifdb_password),
+              'ifiction': ('ifiction.xml', output_etree, 'text/xml'),
+              'links': ('links.xml', etree.tostring(links, encoding='utf-8'), 'text/xml'),
+              'coverart': (data.cover, open(data.cover, 'rb')),
+              'requireIFID': ('', 'no')}
+    r = requests.post(upload_url, data=upload_data, files=params)
+    print()
+    print('Response: ', r.content)
+    return r
 
 def run_pipeline_selenium_loop(destination='https://ifdb.org/'):
     options = Options()
@@ -420,7 +453,7 @@ def run_pipeline_list(urls, destination='https://ifdb.org'):
     for url in urls:
         run_pipeline_selenium(url=url, destination=destination, driver=driver, login=False)
 
-def run_pipeline_csv(csv_path, destination='https://ifdb.org'):
+def run_pipeline_csv(csv_path, destination='https://ifdb.org', add_link=True):
     "Runs a pipeline using a csv exported from an itch.io game jam"
     import pandas as pd
     data = pd.read_csv(csv_path, index_col=False) 
@@ -429,7 +462,10 @@ def run_pipeline_csv(csv_path, destination='https://ifdb.org'):
     driver = webdriver.Firefox(options=options)
     login_selenium(driver, destination) 
     for url in urls:
-        run_pipeline_selenium(url=url, destination=destination, driver=driver, login=False)
+        run_pipeline_selenium(url=url, destination=destination, driver=driver,
+                login=False,
+                add_link=add_link)
+
 
 
 if __name__ == '__main__':
@@ -441,4 +477,6 @@ if __name__ == '__main__':
     #run_pipeline_csv('smoochie-jam-24.csv')
     #run_pipeline_csv('dialogue-jam-24.csv')
     #run_pipeline_csv('locus-jam-24.csv')
-    run_pipeline_csv('neo-twiny-jam-24.csv')
+    #run_pipeline_csv('neo-twiny-jam-24.csv')
+    # username: ifdbadmin@ifdb.org, password: secret
+    run_pipeline_csv('anti-productivity-jam-24.csv', add_link=False)#, destination='http://localhost:8080')
