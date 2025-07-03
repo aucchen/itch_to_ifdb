@@ -19,7 +19,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from itch_data import ItchData
 
-def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
+def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None, row=None):
     """
     Takes in an url of the form https://red-autumn.itch.io/pageant, and returns
     an ItchData object.
@@ -34,7 +34,12 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
     # also, using the api endpoint requires an api token
     # get title and author
     title_author = tree.head.css_first('title').text()
-    title, author = title_author.split(' by ')
+    ta = title_author.split(' by ')
+    if len(ta) > 2:
+        title = ' by '.join(ta[:2])
+        author = ta[-1]
+    else:
+        title, author = title_author.split(' by ')
     # get full description
     desc = tree.css_first('div.formatted_description')
     # TODO: better formatting for the description? iterate through all child elements and...
@@ -74,13 +79,14 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None):
     if cover_url:
         cover_request = requests.get(cover_url)
         image_name = cover_url.split('/')[-1]
-        with open(image_name, 'wb') as f:
-            f.write(cover_request.content)
-        # make the cover smaller
-        subprocess.call('convert {0} -resize 400x300 {0}'.format(image_name), shell=True)
-        # if cover image is a gif, extract the first frame.
-        if image_name.endswith('.gif'):
-            subprocess.call('convert {0}[0] {0}'.format(image_name), shell=True)
+        if not os.path.exists(image_name):
+            with open(image_name, 'wb') as f:
+                f.write(cover_request.content)
+            # make the cover smaller
+            subprocess.call('convert {0} -resize 400x300 {0}'.format(image_name), shell=True)
+            # if cover image is a gif, extract the first frame.
+            if image_name.endswith('.gif'):
+                subprocess.call('convert {0}[0] {0}'.format(image_name), shell=True)
     data = ItchData(url, title, author, release_date, desc, platform, image_name, game_id)
     return data
 
@@ -169,7 +175,7 @@ def login_selenium(driver, destination='https://ifdb.org'):
     driver.find_element(By.ID, 'password').send_keys(password)
     driver.find_element(By.XPATH, "//input[@type='submit']").click()
 
-def upload_selenium(data, destination='https://ifdb.org', login=True, driver=None, add_link=True):
+def upload_selenium(data, destination='https://ifdb.org', login=True, driver=None, add_link=True, tags=None):
     # destination could be http://localhost:8080
     # admin email/password for test: ifdbadmin@ifdb.org, secret
     # 1. log in
@@ -255,6 +261,16 @@ def upload_selenium(data, destination='https://ifdb.org', login=True, driver=Non
         driver.execute_script('closeLinkPopup(); return false;')
     # submit
     driver.find_element(By.ID, 'editgame-save-button').click()
+    # TODO: add tags
+    if tags is not None:
+        element = driver.find_element(By.ID, 'myTagList_edit')
+        driver.execute_script('arguments[0].scrollIntoView();', element)
+        time.sleep(0.1)
+        element.click()
+        driver.find_element(By.ID, 'myTagFld').send_keys(tags)
+        driver.find_element(By.ID, 'viewgame-add-tags-button').click()
+        time.sleep(0.1)
+        driver.find_element(By.ID, 'viewgame-save-tags-button').click()
     if close_driver:
         driver.close()
 
@@ -370,7 +386,7 @@ def run_pipeline(url=None, destination='http://ifdb.org/putific'):
     print('Response: ', r.content)
     return r
 
-def run_pipeline_selenium(url=None, destination='https://ifdb.org/', driver=None, login=True, add_link=True):
+def run_pipeline_selenium(url=None, destination='https://ifdb.org/', driver=None, login=True, add_link=True, row=None, tags=None):
     if not url:
         url = input('Enter an itch.io URL: ')
     data = get_itch_data(url)
@@ -387,7 +403,7 @@ def run_pipeline_selenium(url=None, destination='https://ifdb.org/', driver=None
     if to_continue != 'y':
         print('Data not uploaded.')
         return
-    upload_selenium(data, destination, driver=driver, login=login, add_link=add_link)
+    upload_selenium(data, destination, driver=driver, login=login, add_link=add_link, tags=tags)
 
 def run_pipeline_api(url=None, destination='http://ifdb.org/putific', username=None, password=None):
     if not url:
@@ -453,7 +469,8 @@ def run_pipeline_list(urls, destination='https://ifdb.org'):
     for url in urls:
         run_pipeline_selenium(url=url, destination=destination, driver=driver, login=False)
 
-def run_pipeline_csv(csv_path, destination='https://ifdb.org', add_link=True):
+def run_pipeline_csv(csv_path, destination='https://ifdb.org', add_link=True,
+        tags=None):
     "Runs a pipeline using a csv exported from an itch.io game jam"
     import pandas as pd
     data = pd.read_csv(csv_path, index_col=False) 
@@ -464,7 +481,8 @@ def run_pipeline_csv(csv_path, destination='https://ifdb.org', add_link=True):
     for url in urls:
         run_pipeline_selenium(url=url, destination=destination, driver=driver,
                 login=False,
-                add_link=add_link)
+                add_link=add_link,
+                tags=tags)
 
 
 
@@ -478,5 +496,7 @@ if __name__ == '__main__':
     #run_pipeline_csv('dialogue-jam-24.csv')
     #run_pipeline_csv('locus-jam-24.csv')
     #run_pipeline_csv('neo-twiny-jam-24.csv')
+    #run_pipeline_csv('shufflecomp-2024.csv', add_link=False)#, destination='http://localhost:8080')
+    #run_pipeline_csv('smoochie-jam-25.csv', add_link=False)#, destination='http://localhost:8080')
+    run_pipeline_csv('neo-twiny-jam-25.csv', add_link=False, tags='neo-twiny jam, Neo-Twiny Jam 2025')#, destination='http://localhost:8080')
     # username: ifdbadmin@ifdb.org, password: secret
-    run_pipeline_csv('anti-productivity-jam-24.csv', add_link=False)#, destination='http://localhost:8080')

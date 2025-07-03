@@ -10,7 +10,7 @@ import ifdb
 
 new_url = 'https://ifcomp.org/ballot?alphabetize=1'
 
-end_date = datetime.datetime(2023, 11, 15)
+end_date = datetime.datetime(2024, 11, 15)
 
 with urllib.request.urlopen(new_url) as fp:
     data = fp.read()
@@ -63,4 +63,4 @@ for i, row in enumerate(rows):
 
 import pandas as pd
 df = pd.DataFrame(games)
-df.to_csv('data_2023.tsv', sep='\t', index=None) 
+df.to_csv('data_2024.tsv', sep='\t', index=None) 

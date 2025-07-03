@@ -5,9 +5,9 @@ import urllib.request
 
 import ifdb
 
-old_url = 'https://ifcomp.org/comp/2022'
+old_url = 'https://ifcomp.org/comp/2023'
 
-end_date = datetime.datetime(2022, 11, 15)
+end_date = datetime.datetime(2023, 11, 15)
 
 with urllib.request.urlopen(old_url) as fp:
     data = fp.read()
@@ -74,4 +74,4 @@ for i, row in enumerate(rows):
 
 import pandas as pd
 df = pd.DataFrame(games)
-df.to_csv('data_2022_final.tsv', sep='\t', index=None) 
+df.to_csv('data_2023_final.tsv', sep='\t', index=None) 

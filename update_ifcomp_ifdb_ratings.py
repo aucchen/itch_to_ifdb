@@ -7,13 +7,13 @@ import pandas
 
 import ifdb
 
-filled_data = pandas.read_csv('data_2023.tsv', sep='\t', index_col=None)
+filled_data = pandas.read_csv('data_2024.tsv', sep='\t', index_col=None)
 new_rows = []
 
-end_date = datetime.datetime(2023, 11, 15)
+end_date = datetime.datetime(2024, 11, 15)
 end_date = None
 
-games = ifdb.get_rankings('IFComp 2023')
+games = ifdb.get_rankings('IFComp 2024')
 rankings = {}
 for i, g in enumerate(games):
     rankings[g] = i+1
@@ -30,9 +30,9 @@ for i, row in filled_data.iterrows():
     #rating, count = ifdb.get_ratings(ifdb_id, end_date)
     # get ratings using the api instead.
     rating, count = ifdb.get_ratings_api(ifdb_id)
-    if count >= row['ifdb_rating_count']:
-        new_row['ifdb_rating'] = rating
-        new_row['ifdb_rating_count'] = count
+    #if count >= row['ifdb_rating_count']:
+    new_row['ifdb_rating'] = rating
+    new_row['ifdb_rating_count'] = count
     print('new ratings: {0} {1}'.format(rating, count))
     new_row['Ranking'] = rankings[title]
     time.sleep(0.5)
@@ -42,4 +42,4 @@ for i, row in filled_data.iterrows():
 
 
 df = pandas.DataFrame(new_rows)
-df.to_csv('data_2023.tsv', sep='\t', index=None) 
+df.to_csv('data_2024.tsv', sep='\t', index=None) 
