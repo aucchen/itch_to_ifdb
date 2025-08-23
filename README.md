@@ -11,4 +11,6 @@ This is a simple script for uploading itch.io games to ifdb. There are different
 
 ## Instructions
 
-`python itch_to_ifdb.py`
+In the command line, run `python itch_to_ifdb.py`
+
+You may have to edit the section after `if __name__ == '__main__:'`.

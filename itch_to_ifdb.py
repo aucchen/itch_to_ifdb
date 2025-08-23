@@ -23,6 +23,8 @@ def get_itch_data(url, use_short_desc=False, use_api=False, api_token=None, row=
     """
     Takes in an url of the form https://red-autumn.itch.io/pageant, and returns
     an ItchData object.
+
+    TODO: we could try using <url>/game.json?
     """
     r = requests.get(url)
     tree = HTMLParser(r.content.decode('utf-8'))
@@ -95,12 +97,13 @@ def get_itch_json(game_id, api_token):
     json_url = 'https://api.itch.io/games/' + game_id
     r_json = requests.get(json_url, headers={'Authorization': api_token})
     data = json.loads(r_json.content)
+    print(data)
     data = data['game']
     return ItchData(
             data['url'],
             data['title'],
             data['user']['display_name'],
-            datetime.datetime.strptime(data['published_at'], '%Y-%m-%dT%H:%M:%S.%f'),
+            datetime.datetime.strptime(data['published_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'),
             data['short_text'],
             None, # the field isn't here :(
             data['cover_url'],
@@ -267,7 +270,10 @@ def upload_selenium(data, destination='https://ifdb.org', login=True, driver=Non
         driver.execute_script('arguments[0].scrollIntoView();', element)
         time.sleep(0.1)
         element.click()
-        driver.find_element(By.ID, 'myTagFld').send_keys(tags)
+        time.sleep(0.1)
+        element = driver.find_element(By.ID, 'myTagFld')
+        driver.execute_script('arguments[0].scrollIntoView();', element)
+        element.send_keys(tags)
         driver.find_element(By.ID, 'viewgame-add-tags-button').click()
         time.sleep(0.1)
         driver.find_element(By.ID, 'viewgame-save-tags-button').click()
@@ -498,5 +504,7 @@ if __name__ == '__main__':
     #run_pipeline_csv('neo-twiny-jam-24.csv')
     #run_pipeline_csv('shufflecomp-2024.csv', add_link=False)#, destination='http://localhost:8080')
     #run_pipeline_csv('smoochie-jam-25.csv', add_link=False)#, destination='http://localhost:8080')
-    run_pipeline_csv('neo-twiny-jam-25.csv', add_link=False, tags='neo-twiny jam, Neo-Twiny Jam 2025')#, destination='http://localhost:8080')
+    #run_pipeline_csv('neo-twiny-jam-25.csv', add_link=False, tags='neo-twiny jam, Neo-Twiny Jam 2025')#, destination='http://localhost:8080')
+    #run_pipeline_csv('single-choice-jam-25.csv', add_link=False, tags='single choice jam, Single Choice Jam 2025')
     # username: ifdbadmin@ifdb.org, password: secret
+    run_pipeline_selenium_loop()
